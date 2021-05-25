@@ -1,3 +1,5 @@
+mod hessian;
+
 extern crate nom;
 
 use std::fs::{File, read};
