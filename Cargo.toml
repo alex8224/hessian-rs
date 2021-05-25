@@ -1,0 +1,18 @@
+[package]
+name = "hessian-rs"
+version = "0.1.0"
+authors = ["alex8224@gmail.com"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nom ="*"
+structopt = { version = "0.3", default-features = false }
+chrono = "*"
+rel = {version = "0.1.0", path = "rel"}
+
+
+[profile.release]
+opt-level = 3
+ lto = true
