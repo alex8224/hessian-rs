@@ -11,13 +11,11 @@ use syn::ext::IdentExt;
 #[proc_macro_derive(PrintFields)]
 pub fn derive_print_fields(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
+    let input_2 = &input;
+    dbg!(input_2);
     let ident = input.ident;
     let field_names = field_names(input.data);
     let mut map = std::collections::HashMap::<&str, &str>::new();
-    for field in field_names {
-        let parts = field.split(" ").collect::<Vec<_>>();
-        map.insert(parts[0], parts[1]);
-    }
 
     let ident_name = format!("{}", ident);
     let output = quote! {
