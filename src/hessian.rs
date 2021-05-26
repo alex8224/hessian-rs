@@ -9,6 +9,7 @@ use nom::error::{ErrorKind, make_error};
 use std::cell::RefCell;
 use std::fmt::Debug;
 use std::collections::HashMap;
+use std::time::SystemTime;
 
 
 #[derive(Debug)]
@@ -80,19 +81,17 @@ impl Object {
 }
 
 pub fn copy_slice(slice: &[u8], target: &mut Vec<u8>) {
-    for idx in 0..slice.len() {
-        target.push(slice[idx]);
-    }
+    target.extend_from_slice(slice);
 }
 
 type ParseErr<'a> = Err<(&'a [u8], ErrorKind)>;
 
-struct Serializer<'a> {
+pub struct Serializer<'a> {
     type_ref: RefCell<Vec::<String>>,
     buff: RefCell<&'a [u8]>,
 }
 
-#[derive(Debug, PrintFields)]
+#[derive(Debug)]
 struct Address {
     no: String,
     first: String,
@@ -101,7 +100,7 @@ struct Address {
 
 //class="Person;Person"
 //#[derivde(Hessian, Debug, Display)]
-#[derive(Debug, PrintFields)]
+#[derive(Debug)]
 struct Person {
     name: String,
     age: i32,
@@ -154,13 +153,13 @@ fn create_person() {
     pojo_map.insert("attach".to_string(), Object::Bin(vec![1, 2, 3]));
     pojo_map.insert("tel".to_string(), Object::List(List::UTyped(vec![Object::Str("10086".to_string()), Object::Str("10010".to_string())])));
     p.set(pojo_map);
-    p.print_field_names();
-    let meta = p.meta();
-    println!("{:?}, {:?}", &p, meta);
+    // p.print_field_names();
+    // let meta = p.meta();
+    // println!("{:?}, {:?}", &p, meta);
 }
 
 impl<'a> Serializer<'a> {
-    fn new(out_buff: &'a [u8]) -> Self {
+    pub fn new(out_buff: &'a [u8]) -> Self {
         Self {
             type_ref: RefCell::new(Vec::<String>::new()),
             buff: RefCell::new(out_buff),
@@ -187,12 +186,13 @@ impl<'a> Serializer<'a> {
     }
     fn read_binary_bytag(&self, tag: u8) -> Result<Vec<u8>, ParseErr> {
         let mut last_chunk = false;
-        let mut byte_buff = Vec::new();
+        let mut byte_buff = Vec::with_capacity(256*1024);
         match tag {
             0x20..=0x2f => {
                 //<=15
                 let len = tag - 0x20;
                 let (i, val) = take(len as usize)(self.cur_offset())?;
+                byte_buff.reserve(val.len());
                 copy_slice(val, &mut byte_buff);
                 self.incr_offset(i);
                 Ok(byte_buff)
@@ -202,6 +202,7 @@ impl<'a> Serializer<'a> {
                 let (i, tag2) = be_u8(self.cur_offset())?;
                 let len = u32::from(tag - 0x34) * 256 + u32::from(tag2);
                 let (i, val) = take(len as usize)(i)?;
+                byte_buff.reserve(val.len());
                 copy_slice(val, &mut byte_buff);
                 self.incr_offset(i);
                 Ok(byte_buff)
@@ -210,6 +211,7 @@ impl<'a> Serializer<'a> {
                 last_chunk = tag == 0x42;
                 loop {
                     let val = self.parse_byte_chunks()?;
+                    // byte_buff.reserve(val.len() + byte_buff.len());
                     copy_slice(val, &mut byte_buff);
                     if last_chunk {
                         break;
@@ -219,14 +221,13 @@ impl<'a> Serializer<'a> {
                         last_chunk = tag == 0x42;
                     }
                 }
-                // self.buff.replace(offset);
                 Ok(byte_buff)
             }
             _ => Err(Err::Error(make_error(self.cur_offset(), ErrorKind::Eof)))
         }
     }
 
-    fn read_binary(&mut self) -> Result<Vec<u8>, ParseErr> {
+    pub fn read_binary(&self) -> Result<Vec<u8>, ParseErr> {
         let (i, tag) = be_u8(self.cur_offset())?;
         self.incr_offset(i);
         self.read_binary_bytag(tag)
@@ -588,7 +589,7 @@ impl<'a> Serializer<'a> {
             _ => (None, -1)
         };
 
-        let mut list = vec![];
+        let mut list = Vec::<Object>::with_capacity(len as usize);
         for _ in 0..len {
             let obj = self.read_object()?;
             list.push(obj);
@@ -657,6 +658,7 @@ pub fn test_read_binary() {
     let buf = read("d:/hessian.dat").unwrap();
     let mut ser = Serializer::new(buf.as_ref());
     let vec = ser.read_binary().unwrap();
+    println!("{}", std::str::from_utf8(vec.as_slice()).unwrap());
     let str = ser.read_string().unwrap();
     let boolean = ser.read_bool().unwrap();
     let int = ser.read_int().unwrap();

@@ -61,43 +61,50 @@ enum ConstantType {
 
 impl From<u8> for ConstantType {
     fn from(v: u8) -> Self {
-       match v {
-           7 =>  Self::Class,
-           9 =>  Self::Fieldref,
-           10 => Self::Methodref,
-           11 => Self::InterfaceMethodref,
-           8 =>  Self::String,
-           3 =>  Self::Integer,
-           4 =>  Self::Float,
-           5 =>  Self::Long,
-           6 =>  Self::Double,
-           12 => Self::NameAndType,
-           1 =>  Self::Utf8,
-           15 => Self::MethodHandle,
-           16 => Self::MethodType,
-           18 => Self::InvokeDynamic,
-           _ => Self::EOF,
-       }
+        match v {
+            7 => Self::Class,
+            9 => Self::Fieldref,
+            10 => Self::Methodref,
+            11 => Self::InterfaceMethodref,
+            8 => Self::String,
+            3 => Self::Integer,
+            4 => Self::Float,
+            5 => Self::Long,
+            6 => Self::Double,
+            12 => Self::NameAndType,
+            1 => Self::Utf8,
+            15 => Self::MethodHandle,
+            16 => Self::MethodType,
+            18 => Self::InvokeDynamic,
+            _ => Self::EOF,
+        }
     }
 }
 
 #[derive(Debug)]
 enum AccessFlag {
-    PUBLIC,FINAL, SUPER, INTERFACE, ABSTRACT, SYNTHETIC, ANNOTATION, ENUM
+    PUBLIC,
+    FINAL,
+    SUPER,
+    INTERFACE,
+    ABSTRACT,
+    SYNTHETIC,
+    ANNOTATION,
+    ENUM,
 }
 
 impl From<u16> for AccessFlag {
     fn from(val: u16) -> Self {
-       match val & 0xffff {
-           0x0001 => Self::PUBLIC,
-           0x0010 => Self::FINAL,
-           0x0020 => Self::SUPER,
-           0x0200 => Self::INTERFACE,
-           0x0400 => Self::ABSTRACT,
-           0x1000 => Self::SYNTHETIC,
-           0x2000 => Self::ANNOTATION,
-           _ => Self::ENUM,
-       }
+        match val & 0xffff {
+            0x0001 => Self::PUBLIC,
+            0x0010 => Self::FINAL,
+            0x0020 => Self::SUPER,
+            0x0200 => Self::INTERFACE,
+            0x0400 => Self::ABSTRACT,
+            0x1000 => Self::SYNTHETIC,
+            0x2000 => Self::ANNOTATION,
+            _ => Self::ENUM,
+        }
     }
 }
 
@@ -108,36 +115,36 @@ fn parse_cp_info(input: &[u8]) -> Result<&[u8], ParseErr> {
     use ConstantType::*;
     let (i, tag) = be_u8(input)?.into();
     let c_type = ConstantType::from(tag);
-    let i =  match c_type {
+    let i = match c_type {
         Class | String => {
             let (i, name_index) = be_u16(i)?;
             println!("{:?} name_index {}", c_type, name_index);
             i
-        },
+        }
         Fieldref | Methodref | InterfaceMethodref | NameAndType => {
             let (i, cls_index) = be_u16(i)?;
-            let (i, name_type_index ) = be_u16(i)?;
+            let (i, name_type_index) = be_u16(i)?;
             println!("{:?} cls_index {} name_type_index {}", c_type, cls_index, name_type_index);
             i
-        },
+        }
         Float => {
-            let (i, val ) = be_f32(i)?;
+            let (i, val) = be_f32(i)?;
             println!("{:?} val {} ", c_type, val);
             i
-        },
+        }
         Integer => {
-            let (i, val ) = be_u32(i)?;
+            let (i, val) = be_u32(i)?;
             println!("{:?} val {} ", c_type, val);
             i
-        },
+        }
         Utf8 => {
             let (i, length) = be_u16(i)?;
             print!("{:?} len {} ", c_type, length);
             let (i, u8str) = take(length as usize)(i)?;
             println!("{}", std::str::from_utf8(u8str).unwrap());
             i
-        },
-        _=> {
+        }
+        _ => {
             println!("{:?} parse constant pool end ", c_type);
             input
         }
@@ -152,10 +159,10 @@ fn parse_java(input: &[u8]) -> Result<(&[u8], JavaClass), ParseErr> {
     let (i, count) = be_u16(i)?;
     let mut offset = i;
     let mut cnt = 0;
-    for k in 0..count - 1  {
-        cnt +=1;
+    for k in 0..count - 1 {
+        cnt += 1;
         print!("cnt {} tag  ", k + 1);
-        let i= parse_cp_info(offset)?;
+        let i = parse_cp_info(offset)?;
         offset = i;
     }
 
@@ -165,11 +172,11 @@ fn parse_java(input: &[u8]) -> Result<(&[u8], JavaClass), ParseErr> {
 
     let (i, this_class) = be_u16(i)?;
 
-    let(i, super_class) = be_u16(i)?;
+    let (i, super_class) = be_u16(i)?;
 
-    let(i, iface_cnt) = be_u16(i)?;
+    let (i, iface_cnt) = be_u16(i)?;
 
-    let(i, field_cnt) = be_u16(i)?;
+    let (i, field_cnt) = be_u16(i)?;
 
     Ok((input, JavaClass {
         header: Header {
@@ -194,13 +201,23 @@ struct Opt {
     input: PathBuf,
 }
 
+use hessian_rs::hessian::Serializer;
+use std::time::SystemTime;
 
 fn main() {
-    // let path = "d:\\AbsApplyDialog.class";
-    // let path = "d:\\MqServlet.class";
-    let opt = Opt::from_args();
-    let path = "d:\\TestPrivate.class";
-    let mut buf= read(opt.input).unwrap();
-    let (input, header) = parse_java(&buf[..]).unwrap();
-    println!("{:?}", header);
+
+    let bin = read("d:/hessian.dat").unwrap();
+    let start = SystemTime::now();
+    for i in 0..500000 {
+        let hessian_de = Serializer::new(bin.as_slice());
+        let data = hessian_de.read_binary().unwrap();
+        // println!("read data {} bytes", data.len());
+    }
+    println!("{} ms", start.elapsed().unwrap().as_millis());
+
+    // let opt = Opt::from_args();
+    // let path = "d:\\TestPrivate.class";
+    // let mut buf= read(opt.input).unwrap();
+    // let (input, header) = parse_java(&buf[..]).unwrap();
+    // println!("{:?}", header);
 }
