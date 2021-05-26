@@ -192,7 +192,6 @@ impl<'a> Serializer<'a> {
                 //<=15
                 let len = tag - 0x20;
                 let (i, val) = take(len as usize)(self.cur_offset())?;
-                byte_buff.reserve(val.len());
                 copy_slice(val, &mut byte_buff);
                 self.incr_offset(i);
                 Ok(byte_buff)
@@ -202,7 +201,6 @@ impl<'a> Serializer<'a> {
                 let (i, tag2) = be_u8(self.cur_offset())?;
                 let len = u32::from(tag - 0x34) * 256 + u32::from(tag2);
                 let (i, val) = take(len as usize)(i)?;
-                byte_buff.reserve(val.len());
                 copy_slice(val, &mut byte_buff);
                 self.incr_offset(i);
                 Ok(byte_buff)
