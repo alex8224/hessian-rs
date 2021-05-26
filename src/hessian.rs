@@ -95,7 +95,7 @@ pub struct Serializer<'a> {
 struct Address {
     no: String,
     first: String,
-    phone: u32
+    phone: u32,
 }
 
 //class="Person;Person"
@@ -119,7 +119,7 @@ impl Person {
             male: false,
             attach: vec![],
             tel: vec![],
-            addr: Address {no: "".to_string(), first: "".to_string(),  phone: 0 }
+            addr: Address { no: "".to_string(), first: "".to_string(), phone: 0 },
         }
     }
 
@@ -186,43 +186,47 @@ impl<'a> Serializer<'a> {
     }
     fn read_binary_bytag(&self, tag: u8) -> Result<Vec<u8>, ParseErr> {
         let mut last_chunk = false;
-        let mut byte_buff = Vec::with_capacity(256*1024);
-        match tag {
-            0x20..=0x2f => {
-                //<=15
-                let len = tag - 0x20;
-                let (i, val) = take(len as usize)(self.cur_offset())?;
-                copy_slice(val, &mut byte_buff);
-                self.incr_offset(i);
-                Ok(byte_buff)
-            }
-            0x34..=0x37 => {
-                // <=1023
-                let (i, tag2) = be_u8(self.cur_offset())?;
-                let len = u32::from(tag - 0x34) * 256 + u32::from(tag2);
-                let (i, val) = take(len as usize)(i)?;
-                copy_slice(val, &mut byte_buff);
-                self.incr_offset(i);
-                Ok(byte_buff)
-            }
-            0x41..=0x42 => {
-                last_chunk = tag == 0x42;
-                loop {
-                    let val = self.parse_byte_chunks()?;
-                    // byte_buff.reserve(val.len() + byte_buff.len());
-                    copy_slice(val, &mut byte_buff);
-                    if last_chunk {
-                        break;
-                    } else {
-                        let (i, tag) = be_u8(self.cur_offset())?;
-                        self.incr_offset(i);
-                        last_chunk = tag == 0x42;
-                    }
+        let mut byte_buff = Vec::with_capacity(256 * 1024);
+        let mut inner_tag = tag;
+        loop {
+            let rs: Result<(&[u8], &[u8]), ParseErr> = match inner_tag {
+                0x20..=0x2f => {
+                    //<=15
+                    last_chunk = true;
+                    let len = inner_tag - 0x20;
+                    let (i, val) = take(len as usize)(self.cur_offset())?;
+                    Ok((i, val))
                 }
-                Ok(byte_buff)
+                0x34..=0x37 => {
+                    // <=1023
+                    last_chunk = true;
+                    let (i, tag2) = be_u8(self.cur_offset())?;
+                    let len = u32::from(inner_tag - 0x34) * 256 + u32::from(tag2);
+                    let (i, val) = take(len as usize)(i)?;
+                    Ok((i, val))
+                }
+                0x41..=0x42 => {
+                    last_chunk = inner_tag == 0x42;
+                    let val = self.parse_byte_chunks()?;
+                    let (i, tag) = be_u8(self.cur_offset())?;
+                    inner_tag = tag;
+                    Ok((i, val))
+                }
+                _ => Err(Err::Error(make_error(self.cur_offset(), ErrorKind::Eof)))
+            };
+            match rs {
+                Ok((offset, slice)) => {
+                    copy_slice(slice, &mut byte_buff);
+                    self.incr_offset(offset);
+                }
+                Err(e) => {},
             }
-            _ => Err(Err::Error(make_error(self.cur_offset(), ErrorKind::Eof)))
-        }
+            if last_chunk {
+                break;
+            }
+        };
+
+        Ok(byte_buff)
     }
 
     pub fn read_binary(&self) -> Result<Vec<u8>, ParseErr> {
@@ -232,8 +236,8 @@ impl<'a> Serializer<'a> {
     }
 
     fn read_bool(&self) -> Result<bool, ParseErr> {
-        let (i, tag) = be_u8(*self.buff.borrow())?;
-        self.buff.replace(i);
+        let (i, tag) = be_u8(self.cur_offset())?;
+        self.incr_offset(i);
         if tag == 0x54 {
             //T
             Ok(true)

@@ -208,10 +208,10 @@ fn main() {
 
     let bin = read("d:/hessian.dat").unwrap();
     let start = SystemTime::now();
-    for i in 0..500000 {
+    for i in 0..100000 {
         let hessian_de = Serializer::new(bin.as_slice());
         let data = hessian_de.read_binary().unwrap();
-        // println!("read data {} bytes", data.len());
+        // println!("read data {} bytes {}", data.len(), std::str::from_utf8(data.as_slice()).unwrap());
     }
     println!("{} ms", start.elapsed().unwrap().as_millis());
 
