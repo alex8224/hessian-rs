@@ -219,7 +219,7 @@ impl<'a> Serializer<'a> {
                     copy_slice(slice, &mut byte_buff);
                     self.incr_offset(offset);
                 }
-                Err(e) => {},
+                Err(e) => return Err(e)
             }
             if last_chunk {
                 break;
