@@ -208,9 +208,13 @@ impl<'a> Serializer<'a> {
                 0x41..=0x42 => {
                     last_chunk = inner_tag == 0x42;
                     let val = self.parse_byte_chunks()?;
-                    let (i, tag) = be_u8(self.cur_offset())?;
-                    inner_tag = tag;
-                    Ok((i, val))
+                    if last_chunk {
+                        Ok((self.cur_offset(), val))
+                    }else {
+                        let (i, tag) = be_u8(self.cur_offset())?;
+                        inner_tag = tag;
+                        Ok((i, val))
+                    }
                 }
                 _ => Err(Err::Error(make_error(self.cur_offset(), ErrorKind::Eof)))
             };
@@ -235,7 +239,7 @@ impl<'a> Serializer<'a> {
         self.read_binary_bytag(tag)
     }
 
-    fn read_bool(&self) -> Result<bool, ParseErr> {
+    pub fn read_bool(&self) -> Result<bool, ParseErr> {
         let (i, tag) = be_u8(self.cur_offset())?;
         self.incr_offset(i);
         if tag == 0x54 {
@@ -320,7 +324,7 @@ impl<'a> Serializer<'a> {
         }
     }
 
-    fn read_string(&self) -> Result<String, ParseErr> {
+    pub fn read_string(&self) -> Result<String, ParseErr> {
         let (i, tag) = be_u8(self.cur_offset())?;
         self.incr_offset(i);
         self.read_string_bytag(tag)
@@ -365,7 +369,7 @@ impl<'a> Serializer<'a> {
         &self.buff.borrow()
     }
 
-    fn read_int(&self) -> Result<i32, ParseErr> {
+    pub fn read_int(&self) -> Result<i32, ParseErr> {
         let (i, tag) = be_u8(self.cur_offset())?;
         self.incr_offset(i);
         self.read_int_bytag(tag)
@@ -404,13 +408,13 @@ impl<'a> Serializer<'a> {
         }
     }
 
-    fn read_long(&self) -> Result<i64, ParseErr> {
+    pub fn read_long(&self) -> Result<i64, ParseErr> {
         let (i, tag) = be_u8(self.cur_offset())?;
         self.incr_offset(i);
         self.read_long_bytag(tag)
     }
 
-    fn read_utcdate_bytag(&self, tag: u8) -> Result<u64, ParseErr> {
+    pub fn read_utcdate_bytag(&self, tag: u8) -> Result<u64, ParseErr> {
         match tag {
             0x4a => {
                 // tag = J
@@ -429,13 +433,13 @@ impl<'a> Serializer<'a> {
         }
     }
 
-    fn read_utcdate(&self) -> Result<u64, ParseErr> {
+    pub fn read_utcdate(&self) -> Result<u64, ParseErr> {
         let (i, tag) = be_u8(self.cur_offset())?;
         self.incr_offset(i);
         self.read_utcdate_bytag(tag)
     }
 
-    fn read_double_bytag(&self, tag: u8) -> Result<f64, ParseErr> {
+    pub fn read_double_bytag(&self, tag: u8) -> Result<f64, ParseErr> {
         match tag {
             0x5b => {
                 Ok(0 as f64)
@@ -671,7 +675,7 @@ pub fn test_read_binary() {
     let stval = ser.read_string().unwrap();
     println!("sef size {} string size {}, bool {} i32 is {}, i64 is {} double1 {:10.16e} double 2 {:10.1e}, \
     utcdate {} str {} ", vec.len(), str.len(), boolean, int, long, double, double1, utcdate, stval);
-    for _ in 0..12 {
+    for _ in 0..4 {
         let obj = ser.read_object();
         println!("{:?}", obj.unwrap());
     }
